@@ -26,10 +26,10 @@ To manage delivery and simulate enterprise product lifecycles, the platform's fe
 * **Planned Stack:** MQTT / DuckDB / Prefect Orchestration / Evidence.dev.
 * **[Link to Design Scope](./iot-lakehouse-backlog)**
 
-### Phase 4: Jellyfin Media Intelligence Platform (Status: 🔴 BACKLOG)
-* **Description:** A Python-based ETL pipeline extracting, cleaning, and modeling unstructured media server metadata to analyze domestic consumption habits and content demand profiles.
-* **Planned Stack:** Python (Polars) / JSON parser webhooks / Dimensional modeling (`Fact_Playback_Session`).
-* **[Link to Scoping Document](./jellyfin-intelligence-backlog)**
+### Phase 4: Resume Synchronisation (Status: 🟡 ARCHITECTURE & DESIGN ONLY)
+* **Description:** GitHub as the source of truth for version control and uses automated pipelines to push copies or rendered versions of the resume into Google Drive
+* **Planned Stack:** GitHub-to-Google Drive Automation Pipeline
+* **[Link to Scoping Document](./git2drive)**
 
 ---
 
