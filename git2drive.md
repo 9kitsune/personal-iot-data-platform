@@ -1,4 +1,4 @@
-The GitHub-to-Drive Automation Pipeline (CI/CD Approach)
+# The GitHub-to-Drive Automation Pipeline (CI/CD Approach)
 
 This approach treats GitHub as the source of truth for version control and uses automated pipelines to push copies or rendered versions of the resume into Google Drive.
 
