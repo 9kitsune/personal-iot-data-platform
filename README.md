@@ -26,7 +26,7 @@ To manage delivery and simulate enterprise product lifecycles, the platform's fe
 * **Planned Stack:** MQTT / DuckDB / Prefect Orchestration / Evidence.dev.
 * **[Link to Design Scope](./iot-lakehouse-backlog)**
 
-### Phase 4: Resume Synchronisation (Status: 🟡 ARCHITECTURE & DESIGN ONLY)
+### Phase 4: Resume Synchronisation (Status: 🔵 SAT & UAT)
 * **Description:** GitHub as the source of truth for version control and uses automated pipelines to push copies or rendered versions of the resume into Google Drive
 * **Planned Stack:** GitHub-to-Google Drive Automation Pipeline
 * **[Link to Scoping Document](./git2drive/git2drive.md)**
