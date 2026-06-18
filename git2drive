@@ -1,0 +1,17 @@
+The GitHub-to-Drive Automation Pipeline (CI/CD Approach)
+
+This approach treats GitHub as the source of truth for version control and uses automated pipelines to push copies or rendered versions of the resume into Google Drive.
+
+Tactical Execution:
+
+1. Maintain your Markdown resume in a private or public GitHub repository.
+
+2. Use standard Git workflows (main branch for the master copy, feature branches like tailor/mace-analytics for variations).
+
+3. Set up a GitHub Actions workflow that triggers on a push to any branch.
+
+4. Configure the workflow to use a step like google-github-actions/upload-cloud-storage or a customized script using Google Drive API credentials to upload the .md file (or a compiled PDF) to a specific Google Drive folder.
+
+5. Program the workflow to name the file based on the branch name (e.g., Resume_main.md or Resume_tailor_mace-analytics.md).
+
+Pros: This cleanly isolates your version control metadata from Google Drive's synchronization engine and provides automated backups on both platforms.
