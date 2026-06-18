@@ -69,18 +69,18 @@ Never hardcode your Google credentials into your public or private repository fi
 Step 4: Add the GitHub Actions Workflow File
 In the root directory of your local resume repository, create a file named exactly .github/workflows/sync_to_drive.yml.
 
-Below is a highly tactical, pre-built GitHub Actions configuration script. It triggers on a push to any branch, extracts the branch name, cleans it up to prevent filesystem errors, and pushes the file straight to Drive.
+Below is a highly tactical, pre-built GitHub Actions configuration script. It triggers on a push to any branch, extracts the branch name, cleans it up to prevent filesystem errors, and pushes the file straight to Drive. It also doesn't use any 3rd party marketplace plugin, so it is dependency-free, and secure-by-design.
 
 ```yaml
-name: Sync Resume to Google Drive
+name: Sync Resume to Google Drive (Zero Dependencies)
 
 on:
   push:
     branches:
-      - '**'
+      - '**' # Triggers on push to main or any feature branch
 
 jobs:
-  upload:
+  build-and-upload:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Repository
@@ -92,16 +92,99 @@ jobs:
           BRANCH_NAME=$(echo "${{ github.ref_name }}" | sed 's/\//_/g')
           echo "branch_cleaned=$BRANCH_NAME" >> $GITHUB_OUTPUT
 
-      - name: Upload Markdown to Google Drive
-        uses: adityassankarp/google-drive-upload-gitaction@v0.3
-        with:
-          credentials: ${{ secrets.GDRIVE_CREDENTIALS }}
-          filename: 'resume.md'
-          folderId: ${{ secrets.GDRIVE_FOLDER_ID }}
-          name: 'Resume_${{ steps.extract_branch.outputs.branch_cleaned }}.md'
-          overwrite: 'true'
-```
-What Happens Next?
-Once you save this file, commit it, and push it to GitHub, the workflow will trigger immediately.
+      - name: Install Compilers and Python Auth Drivers
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y pandoc weasyprint python3-pip python3-setuptools
+          # Install the official Google Auth library directly so we can securely generate the token
+          pip3 install google-auth requests
 
-If you switch branches locally using git checkout -b tailor/mace-data-engineer, modify your resume, and run git push origin tailor/mace-data-engineer, GitHub will fire off this script and you will see a brand new file named Resume_tailor_mace-data-engineer.md appear in your Google Drive folder automatically.
+      - name: Compile Markdown to Styled PDF
+        run: |
+          cat << 'EOF' > style.css
+          @page { size: A4; margin: 20mm 15mm; }
+          body { font-family: 'Helvetica Neue', Arial, sans-serif; font-size: 10.5pt; line-height: 1.5; color: #2D3748; }
+          h1 { font-size: 20pt; color: #1A365D; text-transform: uppercase; margin-bottom: 5px; }
+          h3 { font-size: 13pt; color: #2B6CB0; border-bottom: 1px solid #E2E8F0; padding-bottom: 3px; margin-top: 20px; }
+          p, li { margin-bottom: 6px; text-align: justify; }
+          ul { padding-left: 20px; }
+          hr { border: 0; border-top: 1px solid #CBD5E0; margin: 15px 0; }
+          .job-entry { page-break-inside: avoid; }
+          EOF
+
+          pandoc resume.md -s -c style.css -o resume.html
+          weasyprint resume.html resume.pdf
+
+      - name: Generate OAuth Access Token & Upload via Curl
+        env:
+          GDRIVE_CREDENTIALS: ${{ secrets.GDRIVE_CREDENTIALS }}
+          FOLDER_ID: ${{ secrets.GDRIVE_FOLDER_ID }}
+          BRANCH_NAME: ${{ steps.extract_branch.outputs.branch_cleaned }}
+        run: |
+          # 1. Write the credentials JSON out to a temporary local file
+          echo "$GDRIVE_CREDENTIALS" > sa_key.json
+          
+          # 2. Use a short inline Python script to generate a secure Google OAuth access token
+          ACCESS_TOKEN=$(python3 -c "
+          import json
+          from google.oauth2 import service_account
+          import google.auth.transport.requests
+          
+          scopes = ['https://www.googleapis.com/auth/drive.file']
+          creds = service_account.Credentials.from_service_account_file('sa_key.json', scopes=scopes)
+          request = google.auth.transport.requests.Request()
+          creds.refresh(request)
+          print(creds.token)
+          ")
+          
+          # Clean up the secret key from the disk space immediately
+          rm sa_key.json
+          
+          # 3. Define target filenames
+          MD_NAME="Resume_${BRANCH_NAME}.md"
+          PDF_NAME="Resume_${BRANCH_NAME}.pdf"
+          
+          # 4. Upload Markdown file via an explicit Google Drive API Multipart Curl request
+          curl -X POST -L \
+            -H "Authorization: Bearer $ACCESS_TOKEN" \
+            -F "metadata={name: '$MD_NAME', parents: ['$FOLDER_ID']};type=application/json;charset=UTF-8" \
+            -F "file=@resume.md;type=text/markdown" \
+            "https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart"
+            
+          # 5. Upload PDF file via an explicit Google Drive API Multipart Curl request
+          curl -X POST -L \
+            -H "Authorization: Bearer $ACCESS_TOKEN" \
+            -F "metadata={name: '$PDF_NAME', parents: ['$FOLDER_ID']};type=application/json;charset=UTF-8" \
+            -F "file=@resume.pdf;type=application/pdf" \
+            "https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart"
+```
+## The Architecture: "Feature" Branches for Archetypes
+Instead of treating branches as individual applications, treat them as skill-set archetypes. Keep long-lived branches tracking the distinct professional hats you wear:
+* main: The definitive master copy. Every piece of raw experience, every credential, and every award goes here. It is your single source of truth, completely un-truncated.
+* role/data-engineer: Tailored heavily toward Python, PySpark, orchestration (dbt/Airflow), performance tuning, and infrastructure.
+* role/analytics-engineer: Tailored toward data integrity, data warehouse modeling, semantic modeling layers, and bridging architecture with direct business logic.
+* role/data-architect: Focused entirely on high-level enterprise design patterns, governance, platforms (like Fabric), standards-setting, and strategic advisory.
+
+## The Workflow: How to Handle Specific Companies
+* 1.find a specific role at a company, just use the workflow tools to execute an elegant checkout pattern:
+```
+┌──► role/data-engineer ─────────► (Builds generic DE PDF)
+                  │
+[ main ] ─────────┼──► role/analytics-engineer ────► (Builds generic AE PDF)
+(Core Data Estate)│
+                  └──► role/data-architect ────────► (Apply subtle copy tweaks)
+                                │
+                                └───► git commit -m "Company ABC: Emphasize platform leadership"
+```
+* 1.Identify the core requirement: Decide if the target job is closer to a Data Engineer, Analytics Engineer, or Architect role.
+* 2.Check out that specific role branch: git checkout role/data-architect
+* 3.Make minor, surgical changes: Read the job description, spot their specific keywords, and tweak a bullet point or two directly in the file.
+* 4.Commit with context: Commit your changes with a clear descriptive message:
+* ```
+  git commit -am "Tailor summary keywords for Mace Group submission"
+  ```
+* 5.Let the Pipeline Run: GitHub Actions automatically pushes your updated Markdown and styled PDF files to Google Drive under the file name Resume_role_data-architect.pdf.
+
+Pros: 
+* **Easy Upstream Merges**: When you pass a exam, earn a new certification, or finish a massive platform modernization project at work, you add it once to your main branch. You can then cleanly merge main down into your role branches (role/data-engineer, etc.) without managing a tangled web of 40 dead company branches.
+* **Continuous Improvement**: Every time you refine the phrasing on your role/data-architect branch to make it punchier for one application, that value automatically upgrades your baseline template for the next time you apply for an architect role.
